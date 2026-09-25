@@ -1,6 +1,7 @@
 import argparse
+import json
 
-from music_analyze import analyze, db, fetch, ncm, plot
+from music_analyze import analyze, db, energy, fetch, ncm, plot
 
 
 def _client():
@@ -63,6 +64,34 @@ def cmd_plot(args):
     plot.run(raw=args.raw, by_year=args.by_year)
 
 
+def cmd_recompute(args):
+    conn = db.connect()
+    db.init_db(conn)
+    rows = conn.execute(
+        "SELECT id, features_json FROM tracks WHERE status='analyzed' AND features_json IS NOT NULL"
+    ).fetchall()
+    if not rows:
+        print("[recompute] 没有可重算的曲目")
+        return
+    updated = skipped = 0
+    for row in rows:
+        try:
+            feats = json.loads(row["features_json"])
+            value, norm = energy.energy_from_features(feats)
+        except (ValueError, KeyError, TypeError):
+            skipped += 1
+            continue
+        feats.update({f"norm_{k}": v for k, v in norm.items()})
+        conn.execute(
+            "UPDATE tracks SET energy=?, features_json=? WHERE id=?",
+            (value, json.dumps(feats, ensure_ascii=False), row["id"]),
+        )
+        updated += 1
+    conn.commit()
+    print(f"[recompute] 已按当前 config.py 参数重算 {updated} 首（跳过 {skipped}）")
+    print("[recompute] 重新出图: python run.py plot")
+
+
 def cmd_status(args):
     conn = db.connect()
     db.init_db(conn)
@@ -119,6 +148,9 @@ def build_parser():
     p.add_argument("--raw", action="store_true", help="使用未消歧的原始 BPM")
     p.add_argument("--by-year", action="store_true", help="按发行年份着色")
     p.set_defaults(func=cmd_plot)
+
+    p = sub.add_parser("recompute", help="仅用已存特征按当前 Energy 参数重算，不重新下载音频")
+    p.set_defaults(func=cmd_recompute)
 
     p = sub.add_parser("status", help="查看曲库统计")
     p.set_defaults(func=cmd_status)

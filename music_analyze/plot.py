@@ -1,4 +1,5 @@
 import csv
+import math
 from datetime import datetime, timezone
 
 import matplotlib
@@ -12,6 +13,20 @@ from matplotlib.gridspec import GridSpec
 from . import config, db
 
 
+def _setup_font():
+    from matplotlib import font_manager
+
+    available = {f.name for f in font_manager.fontManager.ttflist}
+    for name in ("PingFang SC", "Hiragino Sans GB", "Arial Unicode MS", "Heiti SC"):
+        if name in available:
+            matplotlib.rcParams["font.sans-serif"] = [name, "DejaVu Sans"]
+            matplotlib.rcParams["axes.unicode_minus"] = False
+            return
+
+
+_setup_font()
+
+
 def _box_blur(arr, k=3):
     if k <= 1:
         return arr
@@ -19,6 +34,17 @@ def _box_blur(arr, k=3):
     arr = np.apply_along_axis(lambda m: np.convolve(m, kernel, "same"), 0, arr)
     arr = np.apply_along_axis(lambda m: np.convolve(m, kernel, "same"), 1, arr)
     return arr
+
+
+def _kde(values, grid):
+    values = np.asarray(values, dtype=float)
+    values = values[np.isfinite(values)]
+    if values.size < 2:
+        return np.zeros_like(grid)
+    std = float(values.std())
+    bandwidth = 1.06 * (std if std > 0 else 1.0) * values.size ** (-0.2)
+    diff = (grid[:, None] - values[None, :]) / bandwidth
+    return np.exp(-0.5 * diff**2).sum(axis=1) / (values.size * bandwidth * math.sqrt(2.0 * math.pi))
 
 
 def _year(publish_time):
@@ -84,8 +110,35 @@ def run(raw=False, by_year=False):
     ax.set_ylim(*ylim)
     ax.set_xlabel("BPM")
     ax.set_ylabel("Energy")
-    ax_top.hist(bpm, bins=70, range=xlim, color="#1f77b4", alpha=0.7)
-    ax_right.hist(energy, bins=50, range=ylim, orientation="horizontal", color="#1f77b4", alpha=0.7)
+    ax_top_counts, _ = np.histogram(bpm, bins=70, range=xlim)
+    ax_top.hist(bpm, bins=70, range=xlim, color="#1f77b4", alpha=0.7, label="直方图")
+    bpm_grid = np.linspace(xlim[0], xlim[1], 256)
+    bpm_density = _kde(bpm, bpm_grid)
+    if bpm_density.max() > 0:
+        ax_top.plot(
+            bpm_grid,
+            bpm_density / bpm_density.max() * max(ax_top_counts.max(), 1) * 0.95,
+            color="#d62728",
+            lw=1.6,
+            label="平滑拟合",
+        )
+    ax_top.legend(loc="upper right", fontsize=8, frameon=False)
+
+    right_counts, _ = np.histogram(energy, bins=50, range=ylim)
+    ax_right.hist(
+        energy, bins=50, range=ylim, orientation="horizontal", color="#1f77b4", alpha=0.7, label="直方图"
+    )
+    energy_grid = np.linspace(ylim[0], ylim[1], 256)
+    energy_density = _kde(energy, energy_grid)
+    if energy_density.max() > 0:
+        ax_right.plot(
+            energy_density / energy_density.max() * max(right_counts.max(), 1) * 0.95,
+            energy_grid,
+            color="#d62728",
+            lw=1.6,
+            label="平滑拟合",
+        )
+    ax_right.legend(loc="upper right", fontsize=7, frameon=False)
     ax_top.tick_params(labelbottom=False)
     ax_right.tick_params(labelleft=False)
     ax_top.set_ylabel("count")

@@ -8,7 +8,7 @@
 - VIP 账号正常获取完整音频；只有试听片段的歌曲会被明确标记，而不是静默丢弃
 - 只下载 128kbps standard 音质，逐首分析后立刻删除音频，磁盘占用极低
 - BPM 双引擎：`beat_this`（ISMIR 2024）+ Essentia 交叉验证，带倍频/减半消歧
-- Energy 由 EBU R128 响度、onset 率、谱通量、谱质心按固定标尺加权而成
+- Energy 只使用音量无关特征：onset 率、谱通量、谱质心、ZCR 按固定软标尺加权，再做锚点校准（0–0.2 只留给近乎无内容的音频）；与母带音量无关
 - 结果写入 SQLite，随时中断续跑；图表坐标固定（BPM 40–220，Energy 0–1）
 
 ## 安装
@@ -33,6 +33,7 @@ cd ..
 .venv/bin/python run.py fetch            # 拉收藏（--uid 可分析他人公开歌单）
 .venv/bin/python run.py analyze          # 分析（先用 --limit 5 试跑；Ctrl-C 后可续跑）
 .venv/bin/python run.py plot             # 出图 + CSV（--by-year 着色，--raw 看未消歧 BPM）
+.venv/bin/python run.py recompute        # 改了 Energy 参数后重算，不重新下载音频
 .venv/bin/python run.py status           # 查看进度
 .venv/bin/python run.py all              # 一条龙
 ```
@@ -50,6 +51,7 @@ cd ..
 | `analyze --allow-trial` | 只有试听片段时也分析（标记 `source_kind=trial`，结果可能不准） |
 | `analyze --retry-errors` | 重试之前失败的歌 |
 | `analyze --keep-audio` | 保留下载的 128k 音频（默认分析完即删） |
+| `recompute` | 修改 `config.py` 里的 Energy 权重/标尺后重算已有结果 |
 
 ## 输出（`data/`，已 gitignore）
 
@@ -72,7 +74,9 @@ cd ..
 
 ## 配置
 
-`music_analyze/config.py`：坐标范围、Energy 权重与标尺、消歧阈值、音质等级、限速等。
+`music_analyze/config.py`：坐标范围、Energy 权重/软标尺、消歧阈值、音质等级、限速等。
+Energy 只取音量无关特征（`ENERGY_MAPS` 为各成分 sigmoid 中心/斜率，`ENERGY_WEIGHTS` 为权重，`ENERGY_ANCHORS` 为最终分数锚点校准，
+低端锚点保证钢琴/纯音乐等安静内容不会被压到 0.2 以下，那一区间预留给近乎无内容的音频），改完执行 `python run.py recompute && python run.py plot` 即可看到新图，无需重新分析音频。
 
 ## 免责声明
 

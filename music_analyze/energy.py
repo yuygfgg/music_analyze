@@ -17,10 +17,8 @@ def load_audio(path):
     return mono, sr
 
 
-def _norm(value, lo, hi):
-    if hi <= lo:
-        return 0.0
-    return float(min(1.0, max(0.0, (value - lo) / (hi - lo))))
+def _sigmoid(value, center, scale):
+    return 1.0 / (1.0 + math.exp(-(value - center) / scale))
 
 
 def integrated_loudness(x):
@@ -52,6 +50,24 @@ def spectral_features(x, sr):
     return {"flux_rel": flux, "centroid_hz": centroid, "zcr": zcr, "rms": rms}
 
 
+def feature_maps(feats):
+    values = {
+        "onset": feats["onset_rate"],
+        "flux": feats["flux_rel"],
+        "centroid": math.log2(max(feats["centroid_hz"], 1.0)),
+        "zcr": feats["zcr"],
+    }
+    return {k: _sigmoid(values[k], *config.ENERGY_MAPS[k]) for k in config.ENERGY_MAPS}
+
+
+def energy_from_features(feats):
+    norm = feature_maps(feats)
+    raw = sum(config.ENERGY_WEIGHTS[k] * norm[k] for k in config.ENERGY_WEIGHTS)
+    anchors_x = [point[0] for point in config.ENERGY_ANCHORS]
+    anchors_y = [point[1] for point in config.ENERGY_ANCHORS]
+    return float(np.interp(raw, anchors_x, anchors_y)), norm
+
+
 def analyze_energy(x, sr):
     loudness = integrated_loudness(x)
     feats = spectral_features(x, sr)
@@ -59,17 +75,6 @@ def analyze_energy(x, sr):
     feats["onset_rate"] = float(onset_rate)
     feats["n_onsets"] = int(len(onsets))
     feats["loudness_lufs"] = loudness
-    weights = config.ENERGY_WEIGHTS
-    norm = {
-        "loudness": _norm(loudness, *config.LOUDNESS_RANGE),
-        "onset": _norm(onset_rate, 0.0, config.ONSET_RATE_MAX),
-        "flux": _norm(feats["flux_rel"], 0.0, config.FLUX_MAX),
-        "centroid": _norm(
-            math.log2(max(feats["centroid_hz"], 1.0)),
-            math.log2(config.CENTROID_RANGE_HZ[0]),
-            math.log2(config.CENTROID_RANGE_HZ[1]),
-        ),
-    }
+    energy, norm = energy_from_features(feats)
     feats.update({f"norm_{k}": v for k, v in norm.items()})
-    energy = sum(weights[k] * norm[k] for k in weights)
-    return float(min(1.0, max(0.0, energy))), feats
+    return energy, feats

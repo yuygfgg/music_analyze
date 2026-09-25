@@ -33,11 +33,23 @@ DOUBLE_UPPER_BOUND = 200.0
 MIDPOINT_PROB_RATIO = 0.8
 MIDPOINT_MIN_PROB = 0.35
 
-ENERGY_WEIGHTS = {"loudness": 0.5, "onset": 0.2, "flux": 0.2, "centroid": 0.1}
-LOUDNESS_RANGE = (-30.0, -4.0)
-ONSET_RATE_MAX = 8.0
-FLUX_MAX = 0.6
-CENTROID_RANGE_HZ = (200.0, 5000.0)
+ENERGY_WEIGHTS = {"onset": 0.35, "flux": 0.25, "centroid": 0.20, "zcr": 0.20}
+ENERGY_MAPS = {
+    "onset": (3.8, 0.8),
+    "flux": (0.265, 0.025),
+    "centroid": (11.63, 0.45),
+    "zcr": (0.072, 0.02),
+}
+ENERGY_ANCHORS = [
+    (0.00, 0.00),
+    (0.05, 0.20),
+    (0.15, 0.32),
+    (0.30, 0.46),
+    (0.50, 0.60),
+    (0.70, 0.77),
+    (0.855, 0.92),
+    (1.00, 1.00),
+]
 
 BPM_AXIS = (40.0, 220.0)
 ENERGY_AXIS = (0.0, 1.0)
