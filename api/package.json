@@ -1,0 +1,14 @@
+{
+  "name": "music-analyze-api",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local NetEase Cloud Music API service for music_analyze",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node node_modules/@neteasecloudmusicapienhanced/api/app.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@neteasecloudmusicapienhanced/api": "^4.40.1"
+  }
+}

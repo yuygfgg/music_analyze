@@ -1,0 +1,13 @@
+requests>=2.31
+qrcode[pil]>=7.4
+tqdm>=4.66
+matplotlib>=3.8
+numpy>=1.26
+soundfile>=0.12
+soxr>=0.5
+essentia==2.1b6.dev1389
+torch>=2.2
+torchaudio>=2.2
+beat-this>=1.1.0
+einops>=0.8
+rotary-embedding-torch>=0.6
