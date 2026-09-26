@@ -56,7 +56,7 @@ def _year(publish_time):
         return None
 
 
-def run(raw=False, by_year=False):
+def run(raw=False, by_year=False, make_html=True, open_browser=False):
     conn = db.connect()
     rows = conn.execute(
         "SELECT * FROM tracks WHERE status='analyzed' AND bpm_final IS NOT NULL "
@@ -191,3 +191,12 @@ def run(raw=False, by_year=False):
                 ]
             )
     print(f"[plot] 已导出 {config.CSV_PATH}")
+
+    if make_html:
+        from . import html_report
+
+        html_report.generate(rows, out_path=config.HTML_PATH, raw=raw, by_year=by_year)
+        if open_browser:
+            import webbrowser
+
+            webbrowser.open(config.HTML_PATH.as_uri())

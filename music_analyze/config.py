@@ -7,6 +7,7 @@ DB_PATH = DATA_DIR / "music.db"
 COOKIE_PATH = DATA_DIR / "cookies.json"
 QR_PNG_PATH = DATA_DIR / "login_qr.png"
 PLOT_PATH = DATA_DIR / "bpm_energy_distribution.png"
+HTML_PATH = DATA_DIR / "bpm_energy_distribution.html"
 CSV_PATH = DATA_DIR / "tracks.csv"
 OVERRIDES_PATH = DATA_DIR / "bpm_overrides.csv"
 

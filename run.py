@@ -61,7 +61,12 @@ def cmd_analyze(args):
 
 
 def cmd_plot(args):
-    plot.run(raw=args.raw, by_year=args.by_year)
+    plot.run(
+        raw=args.raw,
+        by_year=args.by_year,
+        make_html=not getattr(args, "no_html", False),
+        open_browser=getattr(args, "open", False),
+    )
 
 
 def cmd_recompute(args):
@@ -116,7 +121,12 @@ def cmd_all(args):
         aggressive=args.aggressive,
         allow_trial=args.allow_trial,
     )
-    plot.run(raw=args.raw, by_year=args.by_year)
+    plot.run(
+        raw=args.raw,
+        by_year=args.by_year,
+        make_html=not getattr(args, "no_html", False),
+        open_browser=getattr(args, "open", False),
+    )
 
 
 def build_parser():
@@ -144,9 +154,11 @@ def build_parser():
     p.add_argument("--allow-trial", action="store_true", help="缺失完整音频时分析试听片段并标记")
     p.set_defaults(func=cmd_analyze)
 
-    p = sub.add_parser("plot", help="绘制固定坐标分布图并导出 CSV")
+    p = sub.add_parser("plot", help="绘制固定坐标分布图并导出 CSV / 交互式 HTML")
     p.add_argument("--raw", action="store_true", help="使用未消歧的原始 BPM")
     p.add_argument("--by-year", action="store_true", help="按发行年份着色")
+    p.add_argument("--no-html", action="store_true", help="不生成交互式 HTML 网页")
+    p.add_argument("--open", action="store_true", help="生成后在浏览器中自动打开交互式 HTML")
     p.set_defaults(func=cmd_plot)
 
     p = sub.add_parser("recompute", help="仅用已存特征按当前 Energy 参数重算，不重新下载音频")
@@ -165,6 +177,8 @@ def build_parser():
     p.add_argument("--allow-trial", action="store_true")
     p.add_argument("--raw", action="store_true")
     p.add_argument("--by-year", action="store_true")
+    p.add_argument("--no-html", action="store_true", help="不生成交互式 HTML 网页")
+    p.add_argument("--open", action="store_true", help="生成后在浏览器中自动打开交互式 HTML")
     p.set_defaults(func=cmd_all)
 
     return parser

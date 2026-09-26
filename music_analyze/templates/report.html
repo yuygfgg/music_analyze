@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPM × Energy Distribution</title>
+    <script>
+/* __VENDOR_ECHARTS__ */
+    </script>
+    <style>
+/* __INLINE_CSS__ */
+    </style>
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-left">
+            <span class="title">BPM × Energy</span>
+            <span class="subtitle">{{ stats.total_tracks }} 首歌曲 · {{ stats.min_year }}–{{ stats.max_year }}</span>
+        </div>
+        <div class="header-controls">
+            <input type="text" id="search-input" placeholder="搜索歌曲 / 歌手..." autocomplete="off">
+            <div class="select-group">
+                <label for="color-select">着色</label>
+                <select id="color-select">
+                    <option value="count" selected>按 歌曲数量 (默认)</option>
+                    <option value="energy">按 Energy</option>
+                    <option value="year">按 年份</option>
+                    <option value="bpm">按 BPM</option>
+                    <option value="mono">单色 (经典)</option>
+                </select>
+            </div>
+            <button id="btn-reset" class="btn-text" title="重置坐标视野">重置</button>
+            <button id="btn-theme" class="btn-icon" title="切换暗黑/明亮主题">◑</button>
+        </div>
+    </header>
+
+    <main class="app-main">
+        <div class="chart-container">
+            <div id="chart"></div>
+        </div>
+
+        <aside class="inspector-panel" id="inspector">
+            <div class="inspector-empty" id="inspector-empty">
+                <p>点击图表上的任意数据点</p>
+                <p class="hint">查看歌曲声学参数与原始数据</p>
+            </div>
+
+            <div class="inspector-content" id="inspector-content" style="display: none;">
+                <div class="coord-tag" id="coord-info">BPM 120.0 · Energy 0.614</div>
+
+                <div class="track-selector" id="track-selector" style="display: none;"></div>
+
+                <div class="track-header">
+                    <div class="track-title-row">
+                        <h2 id="track-name"></h2>
+                        <a id="track-link" href="#" target="_blank" rel="noopener noreferrer">网易云 ↗</a>
+                    </div>
+                    <div class="track-meta" id="track-artist-album"></div>
+                </div>
+
+                <div class="data-table">
+                    <div class="data-row">
+                        <span class="key">最终 BPM</span>
+                        <span class="val" id="val-bpm">-</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="key">BPM 引擎 / 模式</span>
+                        <span class="val" id="val-engine">-</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="key">beat_this / Essentia</span>
+                        <span class="val" id="val-dual-bpm">-</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="key">Energy</span>
+                        <span class="val" id="val-energy">-</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="key">发行年份 / 时长</span>
+                        <span class="val" id="val-year-dur">-</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="key">音频规格</span>
+                        <span class="val" id="val-audio">-</span>
+                    </div>
+                </div>
+
+                <div class="features-block">
+                    <div class="block-title">声学特征分解</div>
+                    <div class="feature-item">
+                        <div class="feature-meta">
+                            <span>打击音率 (Onset Rate)</span>
+                            <span id="feat-onset">-</span>
+                        </div>
+                        <div class="feature-bar"><div id="bar-onset" class="feature-bar-fill"></div></div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-meta">
+                            <span>频谱通量 (Spectral Flux)</span>
+                            <span id="feat-flux">-</span>
+                        </div>
+                        <div class="feature-bar"><div id="bar-flux" class="feature-bar-fill"></div></div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-meta">
+                            <span>频谱质心 (Centroid)</span>
+                            <span id="feat-centroid">-</span>
+                        </div>
+                        <div class="feature-bar"><div id="bar-centroid" class="feature-bar-fill"></div></div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-meta">
+                            <span>过零率 (ZCR)</span>
+                            <span id="feat-zcr">-</span>
+                        </div>
+                        <div class="feature-bar"><div id="bar-zcr" class="feature-bar-fill"></div></div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-meta">
+                            <span>母带响度参考</span>
+                            <span id="feat-loudness">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <details class="raw-data-details">
+                    <summary class="raw-data-summary">
+                        <span>原始数据 (JSON)</span>
+                        <button type="button" class="btn-copy" id="btn-copy-raw">复制</button>
+                    </summary>
+                    <pre class="raw-code"><code id="raw-json-code"></code></pre>
+                </details>
+            </div>
+        </aside>
+    </main>
+
+    <div class="toast" id="toast">已复制</div>
+
+    <script>
+        const APP_DATA = /* __DATA_JSON__ */;
+    </script>
+    <script>
+/* __INLINE_JS__ */
+    </script>
+</body>
+</html>

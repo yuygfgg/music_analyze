@@ -10,6 +10,7 @@
 - BPM 双引擎：`beat_this`（ISMIR 2024）+ Essentia 交叉验证，带倍频/减半消歧
 - Energy 只使用音量无关特征：onset 率、谱通量、谱质心、ZCR 按固定软标尺加权，再做锚点校准（0–0.2 只留给近乎无内容的音频）；与母带音量无关
 - 结果写入 SQLite，随时中断续跑；图表坐标固定（BPM 40–220，Energy 0–1）
+- 双格式输出：静态高清 PNG 分布图 + 现代化交互式 HTML 仪表盘（悬浮查看歌曲、同点聚合展示、单曲声学特征进度条、网易云网页播放链接、原始 JSON 数据一键复制与下载、实时搜索筛选、微抖动防重叠、暗黑/明亮主题）
 
 ## 安装
 
@@ -32,7 +33,7 @@ cd ..
 .venv/bin/python run.py login            # 扫码登录；失败可用 --cookie "MUSIC_U=...; __csrf=..."
 .venv/bin/python run.py fetch            # 拉收藏（--uid 可分析他人公开歌单）
 .venv/bin/python run.py analyze          # 分析（先用 --limit 5 试跑；Ctrl-C 后可续跑）
-.venv/bin/python run.py plot             # 出图 + CSV（--by-year 着色，--raw 看未消歧 BPM）
+.venv/bin/python run.py plot             # 出图 + CSV + 交互式 HTML（--open 自动打开网页，--by-year 着色，--raw 看未消歧 BPM）
 .venv/bin/python run.py recompute        # 改了 Energy 参数后重算，不重新下载音频
 .venv/bin/python run.py status           # 查看进度
 .venv/bin/python run.py all              # 一条龙
@@ -51,14 +52,19 @@ cd ..
 | `analyze --allow-trial` | 只有试听片段时也分析（标记 `source_kind=trial`，结果可能不准） |
 | `analyze --retry-errors` | 重试之前失败的歌 |
 | `analyze --keep-audio` | 保留下载的 128k 音频（默认分析完即删） |
+| `plot --open` | 生成后自动在默认浏览器中打开交互式 HTML 仪表盘 |
+| `plot --no-html` | 只生成 PNG 和 CSV，跳过 HTML 生成 |
+| `plot --by-year` | 默认按发行年份着色（HTML 中也支持一键切换着色方式） |
+| `plot --raw` | 使用未消歧的原始 BPM |
 | `recompute` | 修改 `config.py` 里的 Energy 权重/标尺后重算已有结果 |
 
 ## 输出（`data/`，已 gitignore）
 
 | 文件 | 内容 |
 | --- | --- |
-| `bpm_energy_distribution.png` | 固定坐标分布图 |
-| `tracks.csv` | 每首歌的 BPM / Energy |
+| `bpm_energy_distribution.html` | **交互式全景网页**：悬浮/点选查看歌曲、同坐标多曲聚合、声学特征分解、原始 JSON 数据一键复制与下载、实时检索 |
+| `bpm_energy_distribution.png` | 固定坐标静态分布图（带边缘直方图与 KDE 拟合曲线） |
+| `tracks.csv` | 每首歌的 BPM / Energy 及详细字段导出 |
 | `music.db` | SQLite 结果库，断点续跑 |
 | `bpm_review.csv` | 低 BPM / 双引擎分歧曲目，建议人工复核 |
 | `bpm_overrides.csv` | 人工修正，每行 `id,bpm` |
