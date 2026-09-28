@@ -1,11 +1,11 @@
 # music_analyze
 
-把网易云音乐收藏的歌全部分析一遍：**BPM × Energy**，并画一张坐标固定的二维分布图。
+分析网易云歌单：**BPM × Energy**，并画一张坐标固定的二维分布图。
 
 ## 特性
 
 - 网易云扫码 / cookie 登录，cookie 本地保存，失效自动重登
-- VIP 账号正常获取完整音频；只有试听片段的歌曲会被明确标记，而不是静默丢弃
+- VIP 账号正常获取完整音频；只有试听片段的歌曲会被明确标记
 - 只下载 128kbps standard 音质，逐首分析后立刻删除音频，磁盘占用极低
 - BPM 双引擎：`beat_this`（ISMIR 2024）+ Essentia 交叉验证，带倍频/减半消歧
 - Energy 只使用音量无关特征：onset 率、谱通量、谱质心、ZCR 按固定软标尺加权，再做锚点校准（0–0.2 只留给近乎无内容的音频）；与母带音量无关
@@ -58,7 +58,7 @@ cd ..
 | `plot --raw` | 使用未消歧的原始 BPM |
 | `recompute` | 修改 `config.py` 里的 Energy 权重/标尺后重算已有结果 |
 
-## 输出（`data/`，已 gitignore）
+## 输出（`data/`）
 
 | 文件 | 内容 |
 | --- | --- |
@@ -82,8 +82,3 @@ cd ..
 
 `music_analyze/config.py`：坐标范围、Energy 权重/软标尺、消歧阈值、音质等级、限速等。
 Energy 只取音量无关特征（`ENERGY_MAPS` 为各成分 sigmoid 中心/斜率，`ENERGY_WEIGHTS` 为权重，`ENERGY_ANCHORS` 为最终分数锚点校准，
-低端锚点保证钢琴/纯音乐等安静内容不会被压到 0.2 以下，那一区间预留给近乎无内容的音频），改完执行 `python run.py recompute && python run.py plot` 即可看到新图，无需重新分析音频。
-
-## 免责声明
-
-仅供个人学习与数据分析，请尊重版权、支持正版；音频文件即用即删。
