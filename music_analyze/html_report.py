@@ -172,6 +172,142 @@ def _build_tracks_data(rows, raw=False):
     return tracks
 
 
+def _compute_outliers(tracks):
+    n = len(tracks)
+    if n < 6:
+        return []
+
+    try:
+        from sklearn.ensemble import IsolationForest
+        from sklearn.neighbors import LocalOutlierFactor
+        from sklearn.preprocessing import StandardScaler
+    except Exception:
+        return []
+
+    feats_2d = []
+    feats_nd = []
+    for t in tracks:
+        f = t["features"]
+        bpm = float(t["bpm"])
+        energy = float(t["energy"])
+        feats_2d.append([bpm, energy])
+        feats_nd.append([
+            bpm,
+            energy,
+            float(f.get("onset_rate", 0)),
+            float(f.get("flux_rel", 0)),
+            float(f.get("centroid_hz", 0)),
+            float(f.get("zcr", 0)),
+        ])
+
+    X_2d = np.array(feats_2d, dtype=float)
+    X_nd = np.array(feats_nd, dtype=float)
+
+    X_2d_s = StandardScaler().fit_transform(X_2d)
+    X_nd_s = StandardScaler().fit_transform(X_nd)
+
+    iso_2d = IsolationForest(contamination=0.08, random_state=42).fit(X_2d_s)
+    iso_scores_2d = -iso_2d.score_samples(X_2d_s)
+
+    iso_nd = IsolationForest(contamination=0.08, random_state=42).fit(X_nd_s)
+    iso_scores_nd = -iso_nd.score_samples(X_nd_s)
+
+    n_nbrs = min(20, max(5, n - 1))
+    lof_2d = LocalOutlierFactor(n_neighbors=n_nbrs, contamination=0.08)
+    lof_2d.fit(X_2d_s)
+    lof_scores_2d = -lof_2d.negative_outlier_factor_
+
+    lof_nd = LocalOutlierFactor(n_neighbors=n_nbrs, contamination=0.08)
+    lof_nd.fit(X_nd_s)
+    lof_scores_nd = -lof_nd.negative_outlier_factor_
+
+    def to_pct(scores):
+        ranks = np.empty_like(scores, dtype=float)
+        order = scores.argsort()
+        ranks[order] = np.linspace(0, 1, len(scores))
+        return ranks
+
+    p_iso_2d = to_pct(iso_scores_2d)
+    p_lof_2d = to_pct(lof_scores_2d)
+    p_iso_nd = to_pct(iso_scores_nd)
+    p_lof_nd = to_pct(lof_scores_nd)
+
+    combined = 0.35 * p_iso_2d + 0.35 * p_lof_2d + 0.15 * p_iso_nd + 0.15 * p_lof_nd
+
+    def explain(t, iso_s, lof_s):
+        bpm = t["bpm"]
+        energy = t["energy"]
+        f = t["features"]
+        tags = []
+        if bpm >= 205:
+            tags.append(f"全库极速极值 (BPM {bpm:.1f})")
+        elif bpm >= 195:
+            tags.append(f"极速节拍 (BPM {bpm:.1f})")
+        elif bpm <= 85 and energy >= 0.65:
+            tags.append(f"反常低速高能 (BPM {bpm:.1f}, Energy {energy:.3f})")
+        elif bpm >= 180 and energy <= 0.45:
+            tags.append(f"反常高速低能 (BPM {bpm:.1f}, Energy {energy:.3f})")
+        elif bpm <= 85 and energy <= 0.28:
+            tags.append(f"极慢极轻 (BPM {bpm:.1f}, Energy {energy:.3f})")
+
+        if energy >= 0.88:
+            tags.append(f"全库顶峰能量 (Energy {energy:.3f})")
+        elif energy <= 0.23:
+            tags.append(f"全库极低能量 (Energy {energy:.3f})")
+
+        if lof_s >= 2.0:
+            tags.append(f"LOF局部极度孤立 (LOF={lof_s:.2f})")
+        elif lof_s >= 1.6:
+            tags.append(f"LOF稀疏边界 (LOF={lof_s:.2f})")
+
+        centroid = f.get("centroid_hz", 0)
+        if centroid >= 5500:
+            tags.append(f"高频质心异常 ({int(centroid)} Hz)")
+        onset = f.get("onset_rate", 0)
+        if onset >= 6.0:
+            tags.append(f"打击音极密集 ({onset:.1f}/s)")
+
+        if not tags:
+            if iso_s > 0.65:
+                tags.append(f"孤立森林离群 (Score={iso_s:.2f})")
+            else:
+                tags.append("声学特征反常偏离")
+
+        return tags
+
+    for i, t in enumerate(tracks):
+        t["anomaly_score"] = round(float(combined[i]), 4)
+        t["iso_score"] = round(float(iso_scores_2d[i]), 3)
+        t["lof_score"] = round(float(lof_scores_2d[i]), 3)
+        t["outlier_rank"] = None
+        t["outlier_tags"] = explain(t, iso_scores_2d[i], lof_scores_2d[i])
+        t["outlier_reason"] = " · ".join(t["outlier_tags"])
+
+    top_indices = np.argsort(combined)[::-1][:10]
+    outliers = []
+    for rank, idx in enumerate(top_indices, 1):
+        idx = int(idx)
+        t = tracks[idx]
+        t["outlier_rank"] = int(rank)
+        outliers.append({
+            "rank": int(rank),
+            "track_index": int(idx),
+            "id": int(t["id"]),
+            "name": str(t["name"]),
+            "artists": str(t["artists"]),
+            "album": str(t["album"]),
+            "bpm": float(t["bpm"]),
+            "energy": float(t["energy"]),
+            "iso_score": float(t["iso_score"]),
+            "lof_score": float(t["lof_score"]),
+            "anomaly_score": float(t["anomaly_score"]),
+            "tags": list(t["outlier_tags"]),
+            "reason": str(t["outlier_reason"]),
+        })
+
+    return outliers
+
+
 def _aggregate_points(tracks):
     coord_map = {}
     for t in tracks:
@@ -185,6 +321,10 @@ def _aggregate_points(tracks):
         count = len(indices)
         years = [tracks[i]["year"] for i in indices if tracks[i]["year"] is not None]
         avg_year = round(float(np.mean(years))) if years else None
+
+        outlier_ranks = [int(tracks[i]["outlier_rank"]) for i in indices if tracks[i].get("outlier_rank") is not None]
+        min_rank = min(outlier_ranks) if outlier_ranks else None
+        max_anomaly = max(tracks[i].get("anomaly_score", 0) for i in indices)
 
         j_x = []
         j_y = []
@@ -203,9 +343,11 @@ def _aggregate_points(tracks):
             "x": bpm,
             "y": energy,
             "count": count,
-            "indices": indices,
+            "indices": [int(i) for i in indices],
             "year": avg_year,
             "source_kind": tracks[indices[0]]["source_kind"] if count == 1 else "mixed",
+            "outlier_rank": min_rank,
+            "anomaly_score": round(float(max_anomaly), 4),
             "jitter_x": j_x,
             "jitter_y": j_y,
         })
@@ -214,6 +356,7 @@ def _aggregate_points(tracks):
 
 def generate_html_content(rows, raw=False, by_year=False):
     tracks = _build_tracks_data(rows, raw=raw)
+    outliers = _compute_outliers(tracks)
     points = _aggregate_points(tracks)
 
     bpm_arr = np.array([t["bpm"] for t in tracks], dtype=float)
@@ -246,12 +389,14 @@ def generate_html_content(rows, raw=False, by_year=False):
         "raw_mode": raw,
         "default_by_year": by_year,
         "bpm_guides": config.BPM_GUIDES,
+        "outliers_count": len(outliers),
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
     data_payload = {
         "tracks": tracks,
         "points": points,
+        "outliers": outliers,
         "contours": contours,
         "marginals": marginals,
         "stats": stats,

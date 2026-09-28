@@ -65,7 +65,21 @@ function getBpmColor(bpm) {
     return '#e11d48';
 }
 
+function getOutlierColor(pt) {
+    const isDark = currentTheme === 'dark';
+    const rank = pt.outlier_rank;
+    if (rank === 1) return isDark ? '#fb7185' : '#e11d48';
+    if (rank === 2) return isDark ? '#fb923c' : '#ea580c';
+    if (rank === 3) return isDark ? '#fbbf24' : '#d97706';
+    if (rank && rank <= 6) return isDark ? '#c084fc' : '#9333ea';
+    if (rank && rank <= 10) return isDark ? '#60a5fa' : '#2563eb';
+    const s = pt.anomaly_score || 0;
+    if (s > 0.85) return isDark ? 'rgba(96, 165, 250, 0.5)' : 'rgba(37, 99, 235, 0.45)';
+    return isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(100, 116, 139, 0.2)';
+}
+
 function getPointColor(pt) {
+    if (colorMode === 'outlier') return getOutlierColor(pt);
     if (colorMode === 'count') return getCountColor(pt.count);
     if (colorMode === 'energy') return getEnergyColor(pt.y);
     if (colorMode === 'year') return getYearColor(pt.year);
@@ -80,7 +94,16 @@ function buildSeriesData() {
     return APP_DATA.points.map((pt, i) => {
         const color = getPointColor(pt);
         const count = pt.count;
-        const size = count === 1 ? 8 : (count === 2 ? 11 : (count === 3 ? 14 : (count === 4 ? 16 : 18)));
+        let size = count === 1 ? 8 : (count === 2 ? 11 : (count === 3 ? 14 : (count === 4 ? 16 : 18)));
+        const isOutlierPoint = colorMode === 'outlier' && pt.outlier_rank;
+        if (colorMode === 'outlier') {
+            const rank = pt.outlier_rank;
+            if (rank === 1) size = 18;
+            else if (rank === 2 || rank === 3) size = 16;
+            else if (rank && rank <= 6) size = 14;
+            else if (rank && rank <= 10) size = 12;
+            else size = 6;
+        }
 
         // Check search match
         let isMatch = true;
@@ -93,15 +116,27 @@ function buildSeriesData() {
             });
         }
 
+        const opacity = isMatch
+            ? (colorMode === 'outlier'
+                ? (pt.outlier_rank ? 1.0 : (pt.anomaly_score > 0.85 ? 0.7 : 0.25))
+                : (count > 1 ? 0.95 : 0.75))
+            : 0.08;
+
+        const borderColor = isOutlierPoint
+            ? (isDark ? '#ffffff' : '#0f172a')
+            : (count > 1 ? (isDark ? '#ffffff' : '#0f172a') : (isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)'));
+
+        const borderWidth = isOutlierPoint ? 2 : (count > 1 ? 1.5 : 0.6);
+
         return {
             name: `pt_${i}`,
             value: [pt.x, pt.y, count, pt.year, pt.indices, pt.x, pt.y],
             symbolSize: size,
             itemStyle: {
                 color: isMatch ? color : (isDark ? '#374151' : '#d1d5db'),
-                opacity: isMatch ? (count > 1 ? 0.95 : 0.75) : 0.08,
-                borderColor: count > 1 ? (isDark ? '#ffffff' : '#0f172a') : (isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)'),
-                borderWidth: count > 1 ? 1.5 : 0.6
+                opacity: opacity,
+                borderColor: borderColor,
+                borderWidth: borderWidth
             }
         };
     });
@@ -207,6 +242,11 @@ function getChartOption() {
 
                 let html = '<div class="simple-tooltip">';
                 html += `<div class="stt-coords">BPM ${bpm} · Energy ${energy}</div>`;
+
+                const outlierTrack = indices.map(idx => window.TRACKS[idx]).find(t => t && t.outlier_rank);
+                if (outlierTrack) {
+                    html += `<div style="font-size:11px;font-weight:600;color:#e11d48;margin:2px 0 6px;">⚡ 算法挖掘离群 Top ${outlierTrack.outlier_rank} · ${escapeHtml(outlierTrack.outlier_tags[0] || '反常特征')}</div>`;
+                }
 
                 if (count === 1) {
                     const t = window.TRACKS[indices[0]];
@@ -408,6 +448,21 @@ function updateInspectorDetails(track) {
     document.getElementById('track-artist-album').textContent = `${track.artists} · 《${track.album || '单曲'}》`;
     document.getElementById('track-link').href = `https://music.163.com/#/song?id=${track.id}`;
 
+    // Outlier banner
+    const outlierBanner = document.getElementById('outlier-alert');
+    if (outlierBanner) {
+        if (track.outlier_rank) {
+            outlierBanner.style.display = 'block';
+            document.getElementById('oab-tag').textContent = `⚡ 综合反常度 Top ${track.outlier_rank}`;
+            const isoStr = track.iso_score !== undefined ? Number(track.iso_score).toFixed(3) : '-';
+            const lofStr = track.lof_score !== undefined ? Number(track.lof_score).toFixed(3) : '-';
+            document.getElementById('oab-scores').textContent = `孤立森林: ${isoStr} · LOF: ${lofStr}`;
+            document.getElementById('oab-reason').textContent = track.outlier_reason || '声学与空间特征综合偏离';
+        } else {
+            outlierBanner.style.display = 'none';
+        }
+    }
+
     // Key values
     document.getElementById('val-bpm').textContent = `${track.bpm}`;
     document.getElementById('val-engine').textContent = `${track.bpm_method}`;
@@ -437,6 +492,60 @@ function updateInspectorDetails(track) {
     // Raw JSON
     const rawJsonStr = JSON.stringify(track.raw_record, null, 2);
     document.getElementById('raw-json-code').textContent = rawJsonStr;
+}
+
+// Outliers List in empty inspector
+function renderOutliersList() {
+    const list = document.getElementById('outliers-list');
+    if (!list) return;
+    if (!APP_DATA.outliers || APP_DATA.outliers.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-faint);font-size:12px;text-align:center;padding:12px;">未检测到显著离群曲目</div>';
+        return;
+    }
+    list.innerHTML = '';
+    APP_DATA.outliers.forEach(o => {
+        const item = document.createElement('div');
+        item.className = 'od-item';
+        item.dataset.index = o.track_index;
+        item.innerHTML = `
+            <div class="od-item-top">
+                <span class="od-item-title">${escapeHtml(o.name)}</span>
+                <span class="od-item-rank">#${o.rank}</span>
+            </div>
+            <div class="od-item-meta">${escapeHtml(o.artists)}</div>
+            <div class="od-item-metrics">BPM ${o.bpm.toFixed(1)} · Energy ${o.energy.toFixed(3)}</div>
+            <div class="od-item-reason">${escapeHtml(o.reason || '反常特征')}</div>
+        `;
+        item.addEventListener('click', () => {
+            selectTrackByIndex(o.track_index);
+        });
+        list.appendChild(item);
+    });
+}
+
+function selectTrackByIndex(trackIndex) {
+    const ptIdx = APP_DATA.points.findIndex(p => p.indices.includes(trackIndex));
+    if (ptIdx === -1) return;
+    const pt = APP_DATA.points[ptIdx];
+    const subIdx = pt.indices.indexOf(trackIndex);
+    activePointTrackIndex = subIdx >= 0 ? subIdx : 0;
+    const val = [pt.x, pt.y, pt.count, pt.year, pt.indices, pt.x, pt.y];
+    selectPoint(val);
+    myChart.dispatchAction({
+        type: 'highlight',
+        seriesName: 'Tracks',
+        dataIndex: ptIdx
+    });
+}
+
+function showOutliersPanel() {
+    selectedPoint = null;
+    document.getElementById('inspector-content').style.display = 'none';
+    document.getElementById('inspector-empty').style.display = 'flex';
+    myChart.dispatchAction({
+        type: 'downplay',
+        seriesName: 'Tracks'
+    });
 }
 
 // Copy JSON
@@ -491,9 +600,27 @@ document.getElementById('btn-theme').addEventListener('click', () => {
     renderChart();
 });
 
+const btnBack = document.getElementById('btn-back-outliers');
+if (btnBack) {
+    btnBack.addEventListener('click', showOutliersPanel);
+}
+
+const btnOutliers = document.getElementById('btn-outliers');
+if (btnOutliers) {
+    btnOutliers.addEventListener('click', () => {
+        showOutliersPanel();
+        if (colorMode !== 'outlier') {
+            colorMode = 'outlier';
+            document.getElementById('color-select').value = 'outlier';
+            renderChart();
+        }
+    });
+}
+
 window.addEventListener('resize', () => {
     myChart.resize();
 });
 
-// Initial Render
+// Initial Setup
+renderOutliersList();
 renderChart();

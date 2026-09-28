@@ -23,12 +23,14 @@
                 <label for="color-select">着色</label>
                 <select id="color-select">
                     <option value="count" selected>按 歌曲数量 (默认)</option>
+                    <option value="outlier">按 离群/反常度 (iForest+LOF)</option>
                     <option value="energy">按 Energy</option>
                     <option value="year">按 年份</option>
                     <option value="bpm">按 BPM</option>
                     <option value="mono">单色 (经典)</option>
                 </select>
             </div>
+            <button id="btn-outliers" class="btn-text" title="查看算法挖掘的最离群/反常歌曲">⚡ 离群发现 (10)</button>
             <button id="btn-reset" class="btn-text" title="重置坐标视野">重置</button>
             <button id="btn-theme" class="btn-icon" title="切换暗黑/明亮主题">◑</button>
         </div>
@@ -41,12 +43,34 @@
 
         <aside class="inspector-panel" id="inspector">
             <div class="inspector-empty" id="inspector-empty">
-                <p>点击图表上的任意数据点</p>
-                <p class="hint">查看歌曲声学参数与原始数据</p>
+                <div class="od-panel">
+                    <div class="od-header">
+                        <div class="od-title-row">
+                            <span class="od-badge">算法挖掘</span>
+                            <span class="od-title">离群与反常歌曲</span>
+                        </div>
+                        <div class="od-subtitle">基于 <strong>孤立森林 (iForest)</strong> 与 <strong>局部异常因子 (LOF)</strong> 联合检测</div>
+                    </div>
+                    <div class="od-list" id="outliers-list">
+                        <!-- Populated by JS -->
+                    </div>
+                    <div class="od-footer-hint">点击列表曲目直接在图表中定位高亮</div>
+                </div>
             </div>
 
             <div class="inspector-content" id="inspector-content" style="display: none;">
-                <div class="coord-tag" id="coord-info">BPM 120.0 · Energy 0.614</div>
+                <div class="inspector-topbar">
+                    <button type="button" id="btn-back-outliers" class="btn-back-link">← 返回离群歌曲列表</button>
+                    <div class="coord-tag" id="coord-info">BPM 120.0 · Energy 0.614</div>
+                </div>
+
+                <div class="outlier-alert-banner" id="outlier-alert" style="display: none;">
+                    <div class="oab-header">
+                        <span class="oab-tag" id="oab-tag">⚡ 综合离群 Top 1</span>
+                        <span class="oab-scores" id="oab-scores">iForest: - · LOF: -</span>
+                    </div>
+                    <div class="oab-reason" id="oab-reason">-</div>
+                </div>
 
                 <div class="track-selector" id="track-selector" style="display: none;"></div>
 

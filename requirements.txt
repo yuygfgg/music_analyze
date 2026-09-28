@@ -11,3 +11,4 @@ torchaudio>=2.2
 beat-this>=1.1.0
 einops>=0.8
 rotary-embedding-torch>=0.6
+scikit-learn>=1.4
